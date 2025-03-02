@@ -10,8 +10,8 @@ Spin up a `solana test validator` and `N bonsol prover nodes` to be used in rust
 
 ## Immediate Changes
 
-* remove `figment` toml deserializer and leverage something a library that uses `Serialization` trait for programmatic bonsol-node configs
-* pull bonsol-node docker image from a repository programmatically rather then having to build from the bonsol repository
+* remove `figment` toml deserializer and leverage a library that uses `Serialization` trait for programmatic bonsol-node configs
+* pull bonsol-node docker image from a docker repository programmatically rather then having to build from the bonsol repository
 
 ## Setup
 
