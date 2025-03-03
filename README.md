@@ -1,4 +1,4 @@
-# prover-network
+# Prover-network
 
 Spin up a `solana test validator` and `N bonsol prover nodes` to be used in rust test
 
@@ -6,7 +6,7 @@ Spin up a `solana test validator` and `N bonsol prover nodes` to be used in rust
 
 * `x86-64-amd` due to current `stark to snark` c++ constraint - virtualization will also not work here
 * ports `8899` and `8900` must be free to be used by the `solana-test-validator`
-* both `bonsol.so` and your onchain programs must be located in  ______ .
+* both `bonsol.so` and your onchain program must be located in  ______ .
 
 ## Immediate Changes
 
@@ -27,7 +27,6 @@ initiate the rust prover network harness with a `ctor` constructor before implem
 ```
     const BONSOL_PROVER_NODE_COUNT: usize = 1;
     const SOLANA_RPC_URL: &'static str = "http://localhost:8899";
-    const GAME_PROGRAM: &'static str = "BoNsHRcyLLNdtnoDf8hiCNZpyehMC4FDMxs6NTxFi3ew";
 
     #[ctor::ctor]
     fn init() {

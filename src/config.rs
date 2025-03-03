@@ -1,3 +1,6 @@
+// todo: this file can be removed in its entirety when the Serialization trait
+//       is implemented for the bonsol-node config
+
 use {
     figment::{
         providers::{Format, Toml},

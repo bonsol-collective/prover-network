@@ -1,4 +1,4 @@
-use {once_cell::sync::Lazy, std::path::PathBuf, thiserror::Error};
+use {once_cell::sync::Lazy, std::env, std::path::PathBuf, thiserror::Error};
 
 static WORKING_DIR: Lazy<PathBuf> = Lazy::new(|| env::current_dir().unwrap());
 
@@ -21,9 +21,6 @@ pub mod solana {
             Docker,
         },
     };
-
-    // const BONSOL_PROGRAM_ADDRESS: &str = "BoNsHRcyLLNdtnoDf8hiCNZpyehMC4FDMxs6NTxFi3ew";
-    // const BONSOL_PROGRAM_PATH: &str = "";
 
     const SOLANA_IMAGE: &str = "anzaxyz/agave:v2.0.13";
     const SOLANA_NODE_NAME: &str = "bonsol-prover-network-validator";
@@ -654,8 +651,8 @@ pub mod bonsol {
     pub async fn create(bonsol_node_id: u64) -> Result<(), BonsolNodeError> {
         println!("creating store for prover {}", bonsol_node_id);
         initiate_artifacts(bonsol_node_id)?;
-        let work_dir =
-            env::current_dir().map_err(|e| return BonsolNodeError::RunFailure(e.to_string()))?;
+        let work_dir = std::env::current_dir()
+            .map_err(|e| return BonsolNodeError::RunFailure(e.to_string()))?;
         let config_src = format!(
             "{}{}-{}",
             work_dir.display(),
