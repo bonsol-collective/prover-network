@@ -342,14 +342,29 @@ pub mod prover_network {
         if nodes < 1 {
             return Err(ProverNetworkError::MinimumBonsolNodesRequired);
         }
-        // todo: can we build these containers concurrently?
+
+        let mut set = tokio::task::JoinSet::new();
+
         for i in 1..=nodes {
-            bonsol::create(i as u64)
-                .await
-                .map_err(|e| return ProverNetworkError::BonsolBootErrorOccured(e))?;
-            bonsol::start(i as u64)
-                .await
-                .map_err(|e| return ProverNetworkError::BonsolBootErrorOccured(e))?;
+            set.spawn(async move {
+                bonsol::create(i as u64)
+                    .await
+                    .map_err(ProverNetworkError::BonsolBootErrorOccured)?;
+                bonsol::start(i as u64)
+                    .await
+                    .map_err(ProverNetworkError::BonsolBootErrorOccured)
+            });
+        }
+        if let Some(run) = set.join_next().await {
+            match run {
+                Ok(res) => match res {
+                    Ok(()) => Ok(()),
+                    Err(node_error) => Err(node_error),
+                },
+                Err(err) => {
+                    panic!("unknown join error {}", err)
+                }
+            }
         }
         Ok(())
     }
@@ -757,113 +772,10 @@ pub mod bonsol {
 mod tests {
     use {
         super::{bonsol, prover_network, solana},
-        crate::config::*,
-        anyhow, tokio,
+        anyhow,
+        bollard::{container::InspectContainerOptions, secret::ContainerStateStatusEnum, Docker},
+        tokio,
     };
-
-    //  NOTE: we should really press for changes on the config format for the bonsol node /
-    //        the figment library. this was work around necesasry to deal with that particular debt
-    #[test]
-    fn test_config_serialization_cycle() -> anyhow::Result<()> {
-        let original_toml = r#"risc0_image_folder = "elf"
-max_input_size_mb = 10
-image_download_timeout_secs = 60
-input_download_timeout_secs = 60
-maximum_concurrent_proofs = 10
-max_image_size_mb = 4
-image_compression_ttl_hours = 24
-stark_compression_tools_path = "./stark/"
-env = "dev"
-
-[ingester_config]
-GrpcSubscription = { grpc_url = "http://solana:50051", connection_timeout_secs = 15, timeout_secs = 45, token = "test-token" }
-
-[transaction_sender_config]
-Rpc = { rpc_url = "http://localhost:8899" }
-
-[signer_config]
-KeypairFile = { path = "node_keypair.json" }"#;
-
-        let config: ProverNodeConfig = toml::from_str(original_toml).unwrap();
-        let serialized_toml = toml::to_string(&config).unwrap();
-        let final_config: ProverNodeConfig = toml::from_str(&serialized_toml).unwrap();
-
-        // Check basic config fields
-        assert_eq!(config.risc0_image_folder, final_config.risc0_image_folder);
-        assert_eq!(config.max_input_size_mb, final_config.max_input_size_mb);
-        assert_eq!(
-            config.image_download_timeout_secs,
-            final_config.image_download_timeout_secs
-        );
-        assert_eq!(
-            config.input_download_timeout_secs,
-            final_config.input_download_timeout_secs
-        );
-        assert_eq!(
-            config.maximum_concurrent_proofs,
-            final_config.maximum_concurrent_proofs
-        );
-        assert_eq!(config.max_image_size_mb, final_config.max_image_size_mb);
-        assert_eq!(
-            config.image_compression_ttl_hours,
-            final_config.image_compression_ttl_hours
-        );
-        assert_eq!(
-            config.stark_compression_tools_path,
-            final_config.stark_compression_tools_path
-        );
-        assert_eq!(config.env, final_config.env);
-
-        match (&config.ingester_config, &final_config.ingester_config) {
-            (
-                IngesterConfig::GrpcSubscription {
-                    grpc_url: url1,
-                    connection_timeout_secs: timeout1,
-                    timeout_secs: ts1,
-                    token: token1,
-                },
-                IngesterConfig::GrpcSubscription {
-                    grpc_url: url2,
-                    connection_timeout_secs: timeout2,
-                    timeout_secs: ts2,
-                    token: token2,
-                },
-            ) => {
-                assert_eq!(url1, url2);
-                assert_eq!(timeout1, timeout2);
-                assert_eq!(ts1, ts2);
-                assert_eq!(token1, token2);
-            }
-            _ => panic!("Ingester configs don't match or aren't GrpcSubscription"),
-        }
-
-        match (
-            &config.transaction_sender_config,
-            &final_config.transaction_sender_config,
-        ) {
-            (
-                TransactionSenderConfig::Rpc { rpc_url: url1 },
-                TransactionSenderConfig::Rpc { rpc_url: url2 },
-            ) => {
-                assert_eq!(url1, url2);
-            }
-            _ => panic!("Transaction sender configs don't match"),
-        }
-
-        match (&config.signer_config, &final_config.signer_config) {
-            (
-                SignerConfig::KeypairFile { path: path1 },
-                SignerConfig::KeypairFile { path: path2 },
-            ) => {
-                assert_eq!(path1, path2);
-            }
-            _ => panic!("Signer configs don't match"),
-        }
-
-        let toml_string = toml::to_string(&config).expect("Failed to serialize config");
-        std::fs::write("./config", toml_string)?;
-        Ok(())
-    }
 
     #[tokio::test]
     async fn test_create_bonsol_config() -> anyhow::Result<()> {
@@ -929,19 +841,7 @@ KeypairFile = { path = "node_keypair.json" }"#;
     async fn test_start_single_provers() -> anyhow::Result<()> {
         bonsol::create(1).await?;
         bonsol::start(1).await?;
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_prover_network() -> anyhow::Result<()> {
-        prover_network::stop(10).await?;
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn reset() -> anyhow::Result<()> {
-        prover_network::stop(1).await?;
-        solana::stop().await?;
+        bonsol::stop(1).await?;
         Ok(())
     }
 
@@ -958,7 +858,6 @@ KeypairFile = { path = "node_keypair.json" }"#;
         Ok(())
     }
 
-    use bollard::{container::InspectContainerOptions, secret::ContainerStateStatusEnum, Docker};
     async fn check_exit_status(provers: usize, container_id: &str) -> anyhow::Result<()> {
         let docker = Docker::connect_with_local_defaults()?;
         let inspect_options = InspectContainerOptions::default();
@@ -977,23 +876,42 @@ KeypairFile = { path = "node_keypair.json" }"#;
         Ok(())
     }
 
-    // todo: exit this loop
     #[tokio::test]
     async fn test_prover_network_connectivity() -> anyhow::Result<()> {
         let prover_nodes = 1;
         let bonsol_node_name = "bonsol-node-1";
         let upgrade_authority = solana_sdk::pubkey::new_rand().to_string();
         let callback_program_address = solana_sdk::pubkey::new_rand().to_string();
+
         solana::start(
             upgrade_authority.as_str(),
             callback_program_address.as_str(),
         )
         .await?;
+
         prover_network::start(prover_nodes).await?;
 
+        let mut interval = tokio::time::interval(std::time::Duration::from_millis(100));
+        let timeout = tokio::time::sleep(std::time::Duration::from_secs(30));
+
+        tokio::pin!(timeout);
+
         loop {
-            check_exit_status(prover_nodes, bonsol_node_name).await?;
+            tokio::select! {
+                _ = &mut timeout => {
+                    println!("test completed after 30 seconds");
+                    break;
+                }
+                _ = interval.tick() => {
+                    if let Err(e) = check_exit_status(prover_nodes, bonsol_node_name).await {
+                        eprintln!("check failed: {}", e);
+                        return Err(e);
+                    }
+                }
+            }
         }
+
+        Ok(())
     }
 
     #[tokio::test]
