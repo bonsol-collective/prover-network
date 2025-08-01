@@ -55,15 +55,17 @@ initiate the rust prover network harness with a `ctor` constructor before implem
       })
     }
 
+    #[tokio::test]
     async fn test_bonsol_test_1() -> anyhow::Result<()> {
       /*
-        Implement test code here
+        Implement test code here ...
       */
     }
 
+    #[tokio::test]
     async fn test_bonsol_final() -> anyhow::Result<()> {
       /*
-          Implement test code here ... 
+        Implement test code here ... 
       */
     }
 
