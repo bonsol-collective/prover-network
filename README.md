@@ -22,7 +22,8 @@ Spin up a `solana test validator` and `N bonsol prover nodes` to be used in rust
 
 ## Use
 
-initiate the rust prover network harness with a `ctor` constructor before implementing tests
+initiate the rust prover network harness with a `ctor` constructor before implementing tests. 
+then run your tests like: `cargo test test_db -- --nocapture export PROVER_NETWORK_STATE="start|stop|fullcycle"`
 
 ```
     const BONSOL_PROVER_NODE_COUNT: usize = 1;
@@ -30,29 +31,41 @@ initiate the rust prover network harness with a `ctor` constructor before implem
 
     #[ctor::ctor]
     fn init() {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
-            let upgrade_authority = solana_sdk::pubkey::new_rand().to_string();
-            let callback_program_address = solana_sdk::pubkey::new_rand().to_string();
-            bonsol::solana::start(
-                upgrade_authority.as_str(),
-                callback_program_address.as_str(),
-            )
-            .await
-            .unwrap();
-            bonsol::prover_network::start(BONSOL_PROVER_NODE_COUNT)
-                .await
-                .unwrap();
-        });
+        let prover_network_state = ProverNetworkState::from_env().unwrap();
+        match prover_network_state {
+          ProverNetworkState::Start | ProverNetworkState::FullCycle => {
+          let rt = tokio::runtime::Runtime::new().unwrap();
+          rt.block_on(async {
+              let upgrade_authority = solana_sdk::pubkey::new_rand().to_string();
+              let callback_program_address = solana_sdk::pubkey::new_rand().to_string();
+              bonsol::solana::start(
+                  upgrade_authority.as_str(),
+                  callback_program_address.as_str(),
+              )
+              .await
+              .unwrap();
+              bonsol::prover_network::start(BONSOL_PROVER_NODE_COUNT)
+                  .await
+                  .unwrap();
+          });
+        }
+        _ => return,
+      }
     }
 
     #[ctor::dtor]
     fn end() {
-      let rt = tokio::runtime::Runtime::new().unwrap();
-      rt.block_on(async {
-        bonsol::solana::stop().await?;
-        bonsol::prover_network::stop(BONSOL_PROVER_NODE_COUNT).await?;
-      })
+      let prover_network_state = ProverNetworkState::from_env().unwrap();
+      match prover_network_state {
+          ProverNetworkState::Stop | ProverNetworkState::FullCycle => {
+          let rt = tokio::runtime::Runtime::new().unwrap();
+          rt.block_on(async {
+            bonsol::solana::stop().await?;
+            bonsol::prover_network::stop(BONSOL_PROVER_NODE_COUNT).await?;
+          })
+        }
+        _ => return,
+      }
     }
 
     #[tokio::test]
@@ -65,8 +78,7 @@ initiate the rust prover network harness with a `ctor` constructor before implem
     #[tokio::test]
     async fn test_bonsol_final() -> anyhow::Result<()> {
       /*
-        Implement test code here ... 
-      */
+        Implement test code here ... */
     }
 
 ```

@@ -4,7 +4,6 @@ static WORKING_DIR: Lazy<PathBuf> = Lazy::new(|| env::current_dir().unwrap());
 
 const BONSOL_PROGRAM_ADDRESS: &str = "BoNsHRcyLLNdtnoDf8hiCNZpyehMC4FDMxs6NTxFi3ew";
 const BONSOL_PROGRAM_NAME: &str = "bonsol.so";
-// const BONSOL_PROGRAM_PATH: &str = "";
 
 const DEFAULT_SOLANA_RPC_PORT: u64 = 8899;
 const DEFAULT_SOLANA_WS_PORT: u64 = 8900;
@@ -343,28 +342,13 @@ pub mod prover_network {
             return Err(ProverNetworkError::MinimumBonsolNodesRequired);
         }
 
-        let mut set = tokio::task::JoinSet::new();
-
         for i in 1..=nodes {
-            set.spawn(async move {
-                bonsol::create(i as u64)
-                    .await
-                    .map_err(ProverNetworkError::BonsolBootErrorOccured)?;
-                bonsol::start(i as u64)
-                    .await
-                    .map_err(ProverNetworkError::BonsolBootErrorOccured)
-            });
-        }
-        if let Some(run) = set.join_next().await {
-            match run {
-                Ok(res) => match res {
-                    Ok(()) => Ok(()),
-                    Err(node_error) => Err(node_error),
-                },
-                Err(err) => {
-                    panic!("unknown join error {}", err)
-                }
-            }
+            bonsol::create(i as u64)
+                .await
+                .map_err(ProverNetworkError::BonsolBootErrorOccured)?;
+            bonsol::start(i as u64)
+                .await
+                .map_err(ProverNetworkError::BonsolBootErrorOccured)?;
         }
         Ok(())
     }
