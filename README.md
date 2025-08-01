@@ -4,7 +4,7 @@ Spin up a `solana test validator` and `N bonsol prover nodes` to be used in rust
 
 ## Requirements
 
-* `x86-64-amd` due to current `stark to snark` c++ constraint - virtualization will also not work here
+* `x86-64amd` due to current `stark to snark` c++ constraint - virtualization will also not work here
 * ports `8899` and `8900` must be free to be used by the `solana-test-validator`
 * both `bonsol.so` and your onchain program must be located in  ______ .
 
@@ -22,7 +22,7 @@ Spin up a `solana test validator` and `N bonsol prover nodes` to be used in rust
 
 ## Use
 
-initiate the rust prover network harness with a `ctor` constructor before implementing tests, then tear down the harness in your final test.
+initiate the rust prover network harness with a `ctor` constructor before implementing tests
 
 ```
     const BONSOL_PROVER_NODE_COUNT: usize = 1;
@@ -32,7 +32,6 @@ initiate the rust prover network harness with a `ctor` constructor before implem
     fn init() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            tear_down_systems().await;
             let upgrade_authority = solana_sdk::pubkey::new_rand().to_string();
             let callback_program_address = solana_sdk::pubkey::new_rand().to_string();
             bonsol::solana::start(
@@ -45,7 +44,16 @@ initiate the rust prover network harness with a `ctor` constructor before implem
                 .await
                 .unwrap();
         });
-  }
+    }
+
+    #[ctor::dtor]
+    fn end() {
+      let rt = tokio::runtime::Runtime::new().unwrap();
+      rt.block_on(async {
+        bonsol::solana::stop().await?;
+        bonsol::prover_network::stop(BONSOL_PROVER_NODE_COUNT).await?;
+      })
+    }
 
     async fn test_bonsol_test_1() -> anyhow::Result<()> {
       /*
@@ -57,9 +65,6 @@ initiate the rust prover network harness with a `ctor` constructor before implem
       /*
           Implement test code here ... 
       */
-
-      bonsol::solana::stop().await?;
-      bonsol::prover_network::stop(BONSOL_PROVER_NODE_COUNT).await?;
     }
 
 ```
