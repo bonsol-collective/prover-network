@@ -26,13 +26,13 @@ pub mod solana {
 
     #[derive(Error, Debug)]
     pub enum SolanaError {
-        #[error("Solana start error occured {0}")]
+        #[error("Solana start error occurred {0}")]
         Start(String),
-        #[error("Solana stop error occured {0}")]
+        #[error("Solana stop error occurred {0}")]
         Stop(String),
-        #[error("Solana reset error occured {0}")]
+        #[error("Solana reset error occurred {0}")]
         Reset(String),
-        #[error("Solana upgrade error occured {0}")]
+        #[error("Solana upgrade error occurred {0}")]
         Upgrade(String),
     }
 
