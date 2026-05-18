@@ -1,17 +1,17 @@
-# prover-network
+# Prover-network
 
 Spin up a `solana test validator` and `N bonsol prover nodes` to be used in rust test
 
 ## Requirements
 
-* `x86-64-amd` due to current `stark to snark` c++ constraint - virtualization will also not work here
+* `x86-64amd` due to current `stark to snark` c++ constraint - virtualization will also not work here
 * ports `8899` and `8900` must be free to be used by the `solana-test-validator`
-* both `bonsol.so` and your onchain programs must be located in  ______ .
+* both `bonsol.so` and your onchain program must be located in  ______ .
 
 ## Immediate Changes
 
-* remove `figment` toml deserializer and leverage something a library that uses `Serialization` trait for programmatic bonsol-node configs
-* pull bonsol-node docker image from a repository programmatically rather then having to build from the bonsol repository
+* remove `figment` toml deserializer and leverage a library that uses `Serialization` trait for programmatic bonsol-node configs
+* pull bonsol-node docker image from a docker repository programmatically rather then having to build from the bonsol repository
 
 ## Setup
 
@@ -22,45 +22,63 @@ Spin up a `solana test validator` and `N bonsol prover nodes` to be used in rust
 
 ## Use
 
-initiate the rust prover network harness with a `ctor` constructor before implementing tests, then tear down the harness in your final test.
+initiate the rust prover network harness with a `ctor` constructor before implementing tests. 
+then run your tests like: `cargo test test_db -- --nocapture export PROVER_NETWORK_STATE="start|stop|fullcycle"`
 
 ```
     const BONSOL_PROVER_NODE_COUNT: usize = 1;
     const SOLANA_RPC_URL: &'static str = "http://localhost:8899";
-    const GAME_PROGRAM: &'static str = "BoNsHRcyLLNdtnoDf8hiCNZpyehMC4FDMxs6NTxFi3ew";
 
     #[ctor::ctor]
     fn init() {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
-            tear_down_systems().await;
-            let upgrade_authority = solana_sdk::pubkey::new_rand().to_string();
-            let callback_program_address = solana_sdk::pubkey::new_rand().to_string();
-            bonsol::solana::start(
-                upgrade_authority.as_str(),
-                callback_program_address.as_str(),
-            )
-            .await
-            .unwrap();
-            bonsol::prover_network::start(BONSOL_PROVER_NODE_COUNT)
-                .await
-                .unwrap();
-        });
-  }
+        let prover_network_state = ProverNetworkState::from_env().unwrap();
+        match prover_network_state {
+          ProverNetworkState::Start | ProverNetworkState::FullCycle => {
+          let rt = tokio::runtime::Runtime::new().unwrap();
+          rt.block_on(async {
+              let upgrade_authority = solana_sdk::pubkey::new_rand().to_string();
+              let callback_program_address = solana_sdk::pubkey::new_rand().to_string();
+              bonsol::solana::start(
+                  upgrade_authority.as_str(),
+                  callback_program_address.as_str(),
+              )
+              .await
+              .unwrap();
+              bonsol::prover_network::start(BONSOL_PROVER_NODE_COUNT)
+                  .await
+                  .unwrap();
+          });
+        }
+        _ => return,
+      }
+    }
 
+    #[ctor::dtor]
+    fn end() {
+      let prover_network_state = ProverNetworkState::from_env().unwrap();
+      match prover_network_state {
+          ProverNetworkState::Stop | ProverNetworkState::FullCycle => {
+          let rt = tokio::runtime::Runtime::new().unwrap();
+          rt.block_on(async {
+            bonsol::solana::stop().await?;
+            bonsol::prover_network::stop(BONSOL_PROVER_NODE_COUNT).await?;
+          })
+        }
+        _ => return,
+      }
+    }
+
+    #[tokio::test]
     async fn test_bonsol_test_1() -> anyhow::Result<()> {
       /*
-        Implement test code here
+        Implement test code here ...
       */
     }
 
+    #[tokio::test]
     async fn test_bonsol_final() -> anyhow::Result<()> {
       /*
-          Implement test code here ... 
-      */
-
-      bonsol::solana::stop().await?;
-      bonsol::prover_network::stop(BONSOL_PROVER_NODE_COUNT).await?;
+        Implement test code here ... */
     }
 
 ```
